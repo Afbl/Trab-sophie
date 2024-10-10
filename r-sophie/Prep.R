@@ -17,27 +17,30 @@ library(dplyr)  # for data manipulation
 library(forcats) # for handling factors
 
 # # Define paths to the folders
-# folder_direct <- getwd()  # Folder path for replication data
-# dir.create('out')
-# out <- sprintf('%s/out', getwd())     # Folder path for output
+folder_direct <- getwd()  # Folder path for replication data
+dir.create('out')
 
-# Load the dataset
-gamedata <- read_dta("gamedata.dta")
-head(gamedata)
-colnames(gamedata)
+#### !! ATP SHUT DOWN BECAUSE OF ARRANGE/SORT CONTROVERSY
+# # Load the dataset
+# gamedata <- read_dta("gamedata.dta")
+# 
+# # 'equal' is renamed to 'treatment'
+# # therefore equal \equiv 1
+# # 'unequal' is dropped
+# gamedata <- gamedata %>%
+#   rename(treatment = equal) %>%
+#   select(-unequal)
 
-# 'equal' is renamed to 'treatment'
-# therefore equal \equiv 1
-# 'unequal' is dropped
-gamedata <- gamedata %>%
-  rename(treatment = equal) %>%
-  select(-unequal)
+# ------------------
+
+gamedata <- read_dta(sprintf("%s/Data and Analysis/partial_sorted.dta", getwd()))
+gamedata$treatment <- as.integer(gamedata$treatment)
+gamedata[] <- lapply(gamedata, as.vector)
 
 ## Identification
-# Data will be identified by columns 'id' (participantcode)
-# and 'session' (sessioncode)
+# !! arrange won't agree with stata sort
 gamedata <- gamedata %>%
-  arrange(treatment, participantcode) %>%  # sort wrt 'treatment' and 'participantcode'
+  # arrange(treatment, participantcode) %>%
   mutate(test = row_number()) %>%  # create column based on row indices
   group_by(participantcode) %>%  # group by 'participantcode'
   mutate(id = min(test)) %>%  # create 'id' column
@@ -45,6 +48,8 @@ gamedata <- gamedata %>%
   mutate(session = min(test)) %>% 
   ungroup() %>%
   select(-test) # will only drop 'test' for now
+
+# ------------------
 
 # Some variables renamed
 gamedata <- gamedata %>%
@@ -63,25 +68,33 @@ gamedata <- gamedata %>%
     belief_arming = playerarming_est
   )
 
+# ------------------
+
 # Create "Matching-Groups"
 # !!!! explain, review game design
-# Code in STATA commands ``*tab  indep_obs treatment`` at the end
+
 gamedata <- gamedata %>%
   mutate(indep_obs = session) %>%
   mutate(indep_obs = ifelse(participantid_in_session > 8 & treatment, session + 1, indep_obs)) %>%
   mutate(indep_obs = ifelse(participantid_in_session > 16 & treatment, session + 2, indep_obs))
 
+# ------------------
+
 # Was there a conflict?
 gamedata <- gamedata %>%
-  mutate(conflict = ifelse(attack == 1 & opponent_attack == 1, 1, 0)) %>%
+  mutate(conflict = ifelse(attack == 1 | opponent_attack == 1, 1, 0)) %>%
   mutate(win_conflict = ifelse(conflict == 0, NA, win_conflict))
+
+# ------------------
 
 # Relative Arming and labels
 gamedata <- gamedata %>%
   mutate(rel_arming = arming / endowment) %>%
   mutate(arm_def = ifelse(attack == 0, arming, NA)) %>%
-  mutate(arm_att = ifelse(attack == 1, arming, NA)) %>%
-  
+  mutate(arm_att = ifelse(attack == 1, arming, NA))
+
+
+# ------------------------------------ ♦ ------------------------------------ #
 
 
 # Outcome: Unarmed Peace
@@ -110,15 +123,14 @@ gamedata <- gamedata %>%
 #     belief_UP = unarmed_peace,
 #     check_game = choose_UP
 #   )
-gamedata <- gamedata %>%
-  rename(
-    belief_UP = unarmed_peace,
-    check_game = choose_UP
-  )
+
+
+# ------------------------------------ ♦ ------------------------------------ #
+
 
 # Questionnaire: Risk Aversion
 gamedata <- gamedata %>%
-  mutate(riskaverse = (11 - playerqt1_risk) / 11) %>%
+  mutate(riskaverse = (11 - playerqt1_risk) / 11) %>%  #### diff wrt stata em tese negligível
   select(-playerqt1_risk)
 
 # Rename demographic variables
@@ -144,7 +156,13 @@ gamedata <- gamedata %>%
     compulsive = playerqt5_impulsive
   )
 
+# partial <- read_dta(sprintf("%s/Data and Analysis/partial_questionnaire_block.dta", getwd()))
+# # Remove all attributes and convert to simple vector
+# partial[] <- lapply(partial, as.vector)
+# all.equal(partial$riskaverse,gamedata$riskaverse)
+
+
 # Continue for other sections, adjusting the logic where needed
 
 # Save the modified dataset
-write.csv(gamedata, file = file.path(out, "modified_data.csv"), row.names = FALSE)
+write.csv(gamedata, "ALPHA_final_gamedata.csv", row.names = FALSE)
