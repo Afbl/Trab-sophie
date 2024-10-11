@@ -35,14 +35,7 @@ colnames(gamedata)
 # therefore equal \equiv 1
 # 'unequal' is dropped
 gamedata <- gamedata %>%
-  rename(treatment = equal)
-
-# Define 'treatment' as a factor with labels
-gamedata <- gamedata %>%
-  mutate(treatment = factor(treatment, levels = c(0, 1), labels = c("Unequal", "Equal")))
-
-# Drop the 'unequal' column if it exists
-gamedata <- gamedata %>%
+  rename(treatment = equal)%>%
   select(-unequal)
 
 ## Identification
@@ -108,6 +101,7 @@ attr(gamedata$arm_att, "label") <- "Offensive Arming"
   # Outcome: Unarmed Peace
 gamedata <- gamedata %>%
   mutate(unarmed_peace = ifelse(conflict == 0 & production == endowment & (200 - endowment) == opponent_production, 1, 0))
+
 
 # Individual Strategies
 gamedata <- gamedata %>%
@@ -531,31 +525,32 @@ gamedata <- gamedata %>%
 
 #Ordering
 
-#gamedata <- gamedata %>%
-  #select(treatment, session, id, period, endowment, belief_attack, belief_arming,
-         #production, arming, attack, opponent_production, opponent_arming, opponent_attack,
-         #conflict, rel_arming, arm_def, arm_att, unarmed_peace, choose_UP)
+gamedata <- gamedata %>%
+  select(treatment, session, id, period, endowment, belief_attack, belief_arming,
+         production, arming, attack, opponent_production, opponent_arming, opponent_attack,
+         conflict, rel_arming, arm_def, arm_att, unarmed_peace, choose_UP, everything())
 
-
-
+#Save the modified dataset
 
 #Drop
 
 gamedata <- gamedata %>%
-  select(-participantcode, 
-         -starts_with("playerpayoff4"), -starts_with("playertyp"), 
-         -starts_with("playerpayoff1"), -starts_with("playerpayoff3"), 
-         -playerprize, -playerprob_percent, 
-         -playeractive, -playergamble, -playerback, 
-         -playerpayround2, -playerearnings, -sessioncode, 
-         -playerfinal_payoff, -playerfinal_payoff_help, 
-         -participantid_in_session, -playertotal_arming)
+  select(
+    -playerpayoff4:-playertype,
+    -playerpayoff1:-playerpayoff3,
+    -playerprize:-playerprob_percent,
+    -playeractive:-playergamble,
+    -playerback:-playerpayround2,
+    -playerearnings:-sessioncode,
+    -playerfinal_payoff, 
+    -playerfinal_payoff_help,
+    -participantid_in_session:-playertotal_arming
+  )
 
-# Save the modified dataset
+#Save the modified dataset
+
 write.csv(gamedata, file = file.path(out, "modified_data2.csv"), row.names = FALSE)
 
 tabela_andre <- read.csv("D:/Users/B435076/Desktop/R-S/Data and analysis/out/modified_data2.csv")
 tabela_origin <- read_dta("D:/Users/B435076/Desktop/R-S/Data and analysis/conflict_replication1.dta")
 
-names(tabela_andre)
-names(tabela_origin)
