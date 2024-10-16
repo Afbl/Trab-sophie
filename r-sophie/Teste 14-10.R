@@ -199,6 +199,163 @@ gamedata <- gamedata %>%
 
 
 # STRATEGIES OF PLAYERS
+# Rename questionnaire variables
+gamedata <- gamedata %>%
+  rename(
+    Rudi_Links1 = playerr1,
+    Rudi_Links2 = playerr2,
+    Rudi_Links3 = playerr3,
+    Rudi_Links4 = playerr4,
+    Rudi_Links5 = playerr5,
+    Rudi_Links6 = playerr6,
+    Rudi_Links7 = playerr7,
+    Rudi_Links8 = playerr8,
+    Rudi_Links9 = playerr9,
+    Rudi_Links10 = playerr10
+  )
+
+
+# Initialize Rudi_Links_t variables to 0(ERRO no comando)
+
+gamedata <- gamedata %>%
+  mutate(across(starts_with("Rudi_Links"), ~ 0, .names = "{.col}_t"))
+
+# Update Rudi_Links_t for i = 1 to 5
+for (i in 1:5) {
+  gamedata <- gamedata %>%
+    mutate(across(paste0("Rudi_Links", i:5, "_t"), 
+                  ~ ifelse(get(paste0("Rudi_Links", i)) == 1, 1, .)))
+}
+
+# Update Rudi_Links_t for i = 6 to 10
+for (i in 6:10) {
+  gamedata <- gamedata %>%
+    mutate(across(paste0("Rudi_Links", i:10, "_t"), 
+                  ~ ifelse(get(paste0("Rudi_Links", i)) == 1, 1, .)))
+}
+
+# Create sum variables
+gamedata <- gamedata %>%
+  mutate(
+    sum1 = Rudi_Links1 + Rudi_Links2 + Rudi_Links3 + Rudi_Links4 + Rudi_Links5,
+    sum2 = Rudi_Links6 + Rudi_Links7 + Rudi_Links8 + Rudi_Links9 + Rudi_Links10,
+    sum1t = Rudi_Links1_t + Rudi_Links2_t + Rudi_Links3_t + Rudi_Links4_t + Rudi_Links5_t,
+    sum2t = Rudi_Links6_t + Rudi_Links7_t + Rudi_Links8_t + Rudi_Links9_t + Rudi_Links10_t,
+    fehler1 = ifelse(sum1 != sum1t, 1, 0),
+    fehler2 = ifelse(sum2 != sum2t, 1, 0),
+    X_switch = ifelse(fehler1 != 1 & fehler2 != 1, 6 - sum1, 0),
+    Y_switch = ifelse(fehler1 != 1 & fehler2 != 1, 6 - sum2, 0)
+  )
+
+
+# Recode X_switch and Y_switch
+gamedata <- gamedata %>%
+  mutate(
+    X_switch = case_when(
+      X_switch == 2 ~ 5,
+      X_switch == 3 ~ 6,
+      X_switch == 4 ~ 7,
+      X_switch == 5 ~ 11,
+      TRUE ~ X_switch
+    ),
+    Y_switch = case_when(
+      Y_switch == 2 ~ 5,
+      Y_switch == 3 ~ 6,
+      Y_switch == 4 ~ 7,
+      Y_switch == 5 ~ 11,
+      TRUE ~ Y_switch
+    )
+  )
+
+# Create X_score and Y_score, and handle special cases for sum1 == 0 and sum2 == 0
+gamedata <- gamedata %>%
+  mutate(
+    X_score = 6.5 - X_switch,
+    Y_score = Y_switch - 6.5,
+    X_score = ifelse(sum1 == 0, -5.5, X_score),
+    Y_score = ifelse(sum2 == 0, 5.5, Y_score)
+  )
+
+
+#drop unnecessary lines
+
+gamedata <- gamedata %>%
+  select(-matches("^Rudi_Links[1-9]$"),   # Matches Rudi_Links1 to Rudi_Links9
+         -matches("^Rudi_Links10$"),      # Matches Rudi_Links10
+         -matches("^Rudi_Links[1-9]_t$"), # Matches Rudi_Links1_t to Rudi_Links9_t
+         -matches("^Rudi_Links10_t$"),    # Matches Rudi_Links10_t
+         -c("X_switch", "Y_switch", "fehler1", "fehler2", "sum1","sum2", "sum1t", "sum2t"))
+
+
+# EET Type 
+
+gamedata <- gamedata %>%
+  # Initialize EET_type to 0
+  mutate(EET_type = 0) %>%
+  
+  # Apply the conditions to define EET_type
+  mutate(
+    EET_type = case_when(
+     
+      (X_score == 4.5 | X_score == 5.5) & (Y_score == 0.5 | Y_score == -0.5) ~ 2,  # Kiss-Up
+      (X_score == 0.5 | X_score == -0.5) & (Y_score == -4.5 | Y_score == -5.5) ~ 4,  # Kick-Down
+      X_score < 0 & Y_score < 0 ~ 5,  # Spiteful
+      (X_score == -4.5 | X_score == -5.5) & (Y_score == 0.5 | Y_score == -0.5) ~ 6,  # Envious
+      (X_score == 0.5 | X_score == -0.5) & (Y_score == 4.5 | Y_score == 5.5) ~ 8,  # MaxiMin
+      
+      # Selfish cases
+      X_score > 0 & X_score <= 1.5 & Y_score > 0 & Y_score <= 1.5 ~ 9,
+      X_score > 0 & X_score <= 1.5 & Y_score < 0 & Y_score >= -1.5 ~ 9,
+      X_score < 0 & X_score >= -1.5 & Y_score > 0 & Y_score <= 1.5 ~ 9,
+      X_score < 0 & X_score >= -1.5 & Y_score < 0 & Y_score >= -1.5 ~ 9,
+      
+      X_score > 0 & Y_score > 0  ~ 1,  # Altruist
+      X_score > 0 & Y_score < 0 ~ 3,  # EqualityAvers
+      X_score < 0 & Y_score < 0 ~ 5,  # Spiteful
+      X_score < 0 & Y_score > 0 ~ 7,  # InequalityAvers
+    
+      # Undefined
+      is.na(X_score) ~ 0,
+      
+      TRUE ~ EET_type  # Keep EET_type as is if no conditions are met
+    )
+  )
+
+
+
+
+# Optionally, label the EET_type variable as a factor with descriptive labels
+
+
+# Filter by period == 1 to view a specific subset of the data
+result <- gamedata %>%
+  filter(period == 1) %>%
+  count(EET_type)
+
+
+
+
+
+#Alternative: Relevant types
+
+gamedata <- gamedata %>%
+  # Initialize EET_type_new to 0
+  mutate(EET_type_new = 0) %>%
+  
+  # Update EET_type_new based on the conditions
+  mutate(
+    EET_type_new = case_when(
+      EET_type == 1 ~ 1,  # Altruist
+      EET_type == 9  ~ 2,  # Selfish
+      EET_type == 8  ~ 3,  # Maximin
+      TRUE ~ EET_type_new  # Keep as 0 for all others
+    )
+  )
+
+
+
+
+# STRATEGIES OF PLAYERS
 
 # Renaming the variables
 gamedata <- gamedata %>%
@@ -248,24 +405,15 @@ gamedata <- gamedata %>%
     . == 2 ~ 2   # Adicionado pra complementar
   )))
 
-gamedata <- gamedata %>%
-  mutate(across(all_of(recoded_vars), ~ factor(., levels = c(5, 4, 3, 2, 1), 
-                                               labels = c("Fully Agree", "Rather Agree", "Neither", 
-                                                          "Rather Disagree", "Fully Disagree"))))
 
 #checkdeck
 
 
 gamedata <- gamedata %>%
-  mutate(
-    attack_understand_num = recode(attack_understand, "Fully Agree" = 5,"Rather Agree" = 4, "Neither" = 3, "Rather Disagree" = 2, "Fully Disagree" = 1 ),
-    noattack_understand_num = recode(noattack_understand, "Fully Agree" = 5,"Rather Agree" = 4, "Neither" = 3, "Rather Disagree" = 2, "Fully Disagree" = 1 ),
-    arming_understand_num = recode(arming_understand, "Fully Agree" = 5,"Rather Agree" = 4, "Neither" = 3, "Rather Disagree" = 2, "Fully Disagree" = 1 )
-  )%>%
   mutate(check_dec = case_when( 
-    attack_understand_num < 4 & 
-      noattack_understand_num < 4 & 
-      arming_understand_num < 4 ~ 1,
+    attack_understand < 4 & 
+      noattack_understand < 4 & 
+      arming_understand < 4 ~ 1,
     TRUE ~ 0
   ))
 
@@ -312,6 +460,54 @@ gamedata <- gamedata %>%
   mutate(Altruist = ifelse(EET_type_new == 1, 1, 0),
   Selfish = ifelse(EET_type_new == 2, 1, 0),
   Maximin = ifelse(EET_type_new == 3, 1, 0))
+
+
+write.csv(gamedata, file = file.path(out, "partial_data3.csv"), row.names = FALSE)
+tabela_andre1 <- read.csv('/Users/andremac/Desktop/Trab-sophie-renan/r-sophie/out/partial_data3.csv')
+tabela_origin2 <- read_dta('/Users/andremac/Desktop/Trab-sophie-renan/r-sophie/data_partial3.dta')
+
+
+#OUTCOME FOR DEVELOPMENT
+
+gamedata <- gamedata %>%
+  mutate(armed_peace = ifelse(conflict == 0 & (arming != 0 | opponent_arming != 0), 1, 0))
+
+gamedata <- gamedata %>%
+  mutate(armed_conflict = ifelse(conflict == 1 & (arming != 0 | opponent_arming != 0), 1, 0))
+
+
+
+
+
+#Ordering
+
+gamedata <- gamedata %>%
+  select(treatment, session, id, period, endowment, belief_attack, belief_arming,
+         production, arming, attack, opponent_production, opponent_arming, opponent_attack,
+         conflict, rel_arming, arm_def, arm_att, unarmed_peace, choose_UP, everything())
+
+#Save the modified dataset
+
+
+
+gamedata <- gamedata %>%
+  select(-participantcode)
+#Drop
+
+gamedata <- gamedata %>%
+  select(
+    -playerpayoff4:-playertype,
+    -playerpayoff1:-playerpayoff3,
+    -playerprize:-playerprob_percent,
+    -playeractive:-playergamble,
+    -playerback:-playerpayround2,
+    -playerearnings:-sessioncode,
+    -playerfinal_payoff, 
+    -playerfinal_payoff_help,
+    -participantid_in_session:-playertotal_arming
+  )
+
+#Save the modified dataset
 
 
 write.csv(gamedata, file = file.path(out, "partial_data3.csv"), row.names = FALSE)
