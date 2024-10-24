@@ -39,11 +39,11 @@ reg_out_cont <- c("arming", "arm_att", "arm_def", "rel_arming")
 reg_out_bin_f <- c("attack", "choose_UP")
 reg_out_cont_f <- c("arming")
 
-############################################
 
+############################################ Average Treatment Effects
 
-FolderDirect <- getwd()  # Path of the folder "Replication_Conflict"
-out <- sprintf('%s/out', FolderDirect)    # Path of output folder
+conflict_replication1$arming
+
 
 # Define a helper function to fit the models, compute margins, and store results
 fit_model <- function(output, formula_basic, formula_full, data, model_type = "binary") {
@@ -61,7 +61,7 @@ fit_model <- function(output, formula_basic, formula_full, data, model_type = "b
   margins_a <- margins(model_full, variables = "treatment", atmeans = TRUE)
 
   # Marginal effects over treatment
-  margins_rr <- margins(model_basic, variables = "treatment", over = "treatment")
+  margins_rr <- margins(model_basic, variables = "treatment")
   margins_aa <- margins(model_full, variables = "treatment", over = "treatment", atmeans = TRUE)
 
   # Store coefficients and marginal effects
@@ -105,6 +105,7 @@ continuous_results <- lapply(reg_out_cont, function(output) {
 binary_results[[1]]$model_basic    # Basic model for the first binary outcome
 binary_results[[1]]$coef_r         # Marginal effect coefficient for the first binary outcome
 continuous_results[[1]]$margins_a  # Margins for the first continuous outcome
+continuous_results[[which(reg_out_cont == "arming")]]$coef_r
 
 
 #############################################################
@@ -531,3 +532,196 @@ for (var in vars) {
   cat(paste0(var, " - Upper Limit (80): ", summary_endowment_80$upper, "\n"))
 }
 
+
+################################################# Avg endowment effects
+
+install.packages(c("lme4", "margins", "broom.mixed"))
+
+library(lme4)
+library(margins)
+library(broom.mixed)
+
+your_data <- conflict_replication1
+
+# Attacking - without covariates
+mod_r_attack <- glmer(attack ~ endowment + (1 | indep_obs) + (1 | id), 
+                      data = your_data, family = binomial(link = "probit"), 
+                      subset = (treatment == 0))
+marg_r_attack <- margins(mod_r_attack, variables = "endowment")
+coef_attack_r <- summary(marg_r_attack)$AME
+
+# Create a formula by pasting the covariates into the model formula
+form_attack <- as.formula(paste("attack ~ endowment +",
+                                paste(reg_cov, collapse = " + "),
+                                "+ (1 | indep_obs) + (1 | id)"))
+
+# Standardize endowment and covariates (if necessary)
+your_data$endowment_scaled <- scale(your_data$endowment)
+# If reg_cov contains other covariates, scale them too
+your_data <- your_data %>%
+  mutate(across(all_of(reg_cov), scale))
+# Refit the model with the scaled variables
+form_attack_scaled <- as.formula(paste("attack ~ endowment_scaled +",
+                                       paste(reg_cov, collapse = " + "),
+                                       "+ (1 | indep_obs) + (1 | id)"))
+mod_a_attack_scaled <- glmer(form_attack_scaled,
+                             data = your_data,
+                             family = binomial(link = "probit"),
+                             subset = (treatment == 0),
+                             control = glmerControl(optimizer = "bobyqa",
+                                                    optCtrl = list(maxfun = 100000)))
+
+# Fit the model with the formula
+mod_a_attack <- glmer(form_attack,
+                      data = conflict_replication1,
+                      family = binomial(link = "probit"),
+                      subset = (treatment == 0))
+margins(mod_a_attack,
+        variables = "endowment", atmeans=TRUE)
+summary(marg_a_attack)$AME
+
+# Calculate marginal effects at means
+mod_a_attack_scaled
+marg_a_attack <- margins(mod_a_attack_scaled,
+                         variables = "endowment_scaled", atmeans=TRUE)
+coef_attack_a <- summary(marg_a_attack)$AME
+
+# Margins by levels of endowment
+marg_rr_attack <- margins(mod_r_attack, at = list(endowment = unique(your_data$endowment)))
+marg_aa_attack <- margins(mod_a_attack, at = list(endowment = unique(your_data$endowment)))
+
+###################################
+########## manual endowment #####
+###################################
+# Define a helper function to fit the models, compute margins, and store results
+fit_model_endowment <- function(output, formula_basic, formula_full,
+                      data, margin_vb, model_type = "binary") {
+  
+  if (model_type == "binary") {
+    model_basic <- glmer(formula_basic, data = data, family = binomial(link = "probit"))
+    model_full  <- glmer(formula_full, data = data, family = binomial(link = "probit"))
+  } else {
+    model_basic <- lmer(formula_basic, REML = FALSE, data = data)
+    model_full  <- lmer(formula_full, REML = FALSE, data = data)
+  }
+  
+  # Marginal effects
+  margins_r <- margins(model_basic, variables = margin_vb)
+  margins_a <- margins(model_full, variables = margin_vb, atmeans = TRUE)
+  
+  # Marginal effects over treatment
+  margins_rr <- margins(model_basic, variables = margin_vb, over = margin_vb)
+  margins_aa <- margins(model_full, variables = margin_vb, over = margin_vb, atmeans = TRUE)
+  
+  # Store coefficients and marginal effects
+  coef_r <- summary(margins_r)$AME[1]
+  coef_a <- summary(margins_a)$AME[1]
+  
+  list(
+    model_basic = model_basic,
+    model_full = model_full,
+    margins_r = margins_r,
+    margins_a = margins_a,
+    margins_rr = margins_rr,
+    margins_aa = margins_aa,
+    coef_r = coef_r,
+    coef_a = coef_a
+  )
+}
+
+# Prepare the basic and full formulas for binary and continuous outcomes
+prepare_formulas <- function(output, reg_cov) {
+  formula_basic <- as.formula(paste(output, "~ endowment + attack + (1|indep_obs) + (1|id)"))
+  formula_full  <- as.formula(paste(output, "~ endowment + attack +", paste(reg_cov, collapse = "+"),
+                                    "+ (1|indep_obs) + (1|id)"))
+  list(formula_basic = formula_basic, formula_full = formula_full)
+}
+
+# Apply the models for binary outcomes
+binary_results <- lapply(reg_out_bin, function(output) {
+  formulas <- prepare_formulas(output, reg_cov)
+  fit_model(output, formulas$formula_basic, formulas$formula_full, conflict_replication1, model_type = "binary")
+})
+
+treat0 <- conflict_replication1 %>% subset(treatment==0)
+
+# Apply the models for continuous outcomes
+continuous_results <-
+  lapply(reg_out_cont, function(output) {
+    formulas <- prepare_formulas(output, reg_cov)
+    fit_model_endowment(output,
+                        formulas$formula_basic,
+                        formulas$formula_full,
+                        conflict_replication1,
+                        model_type = "continuous",
+                        margin_vb='endowment')
+})
+
+# The results are stored in lists, with each element corresponding to a specific output variable
+# You can access them like this:
+binary_results[[1]]$model_basic    # Basic model for the first binary outcome
+binary_results[[1]]$coef_r         # Marginal effect coefficient for the first binary outcome
+continuous_results[[1]]$margins_a  # Margins for the first continuous outcome
+continuous_results[[which(reg_out_cont == "arm_def")]]$coef_a
+
+#########
+####### Arming & Relative Arming
+#########
+
+install.packages('purrr')
+library(purrr)
+
+your_data <- conflict_replication1
+your_data_zero <- your_data %>% subset(treatment==0)
+your_data_zero$endowment <- relevel(as.factor(your_data_zero$endowment), ref = '120')
+
+results <- map(reg_out_cont, function(output) {
+  # Without covariates
+  mod_r_output <- lmer(as.formula(paste0(output,
+                                         " ~ endowment + (1 | indep_obs) + (1 | id)")), 
+                       data = your_data_zero,
+                       REML = FALSE)
+  marg_r_output <- margins(mod_r_output, variables = "endowment")
+  coef_r_output <- summary(marg_r_output)$AME
+  
+  # With covariates
+  form_output <- as.formula(paste(output, "~ endowment +", paste(reg_cov, collapse = " + "), "+ (1 | indep_obs) + (1 | id)"))
+  mod_a_output <- lmer(form_output,
+                       data = your_data_zero,
+                       REML = FALSE)
+  marg_a_output <- margins(mod_a_output, variables = "endowment", atmeans=TRUE)
+  coef_a_output <- summary(marg_a_output)$AME
+  
+  # Margins by levels of endowment
+  marg_rr_output <- margins(mod_r_output, at = list(endowment = unique(your_data_zero$endowment)))
+  marg_aa_output <- margins(mod_a_output, at = list(endowment = unique(your_data_zero$endowment)))
+  
+  # Store results in a list
+  list(coef_r_output = coef_r_output, 
+       coef_a_output = coef_a_output, 
+       marg_a_output = marg_a_output,
+       marg_r_output = marg_r_output,
+       marg_rr_output = marg_rr_output, 
+       marg_aa_output = marg_aa_output)
+})
+
+coef_arming_r <- results[[1]]$coef_r_output
+coef_relative_arming_r <- results[[2]]$coef_r_output
+
+results
+
+######### prroof test
+results[[which(reg_out_cont == "arm_def")]]$marg_a_output
+#continuous_results[[which(reg_out_cont == "arming")]]$coef_r
+
+levels(your_data$endowment)
+
+factor(your_data$endowment, ref = 120)
+
+relevel(as.factor(your_data$endowment), ref = '120')
+
+your_data$endowment
+
+as.factor(your_data$endowment)
+
+as.factor(your_data$endowment, ref=80)
