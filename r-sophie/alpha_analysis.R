@@ -42,8 +42,6 @@ reg_out_cont_f <- c("arming")
 
 ############################################ Average Treatment Effects
 
-conflict_replication1$arming
-
 
 # Define a helper function to fit the models, compute margins, and store results
 fit_model <- function(output, formula_basic, formula_full, data, model_type = "binary") {
@@ -105,10 +103,51 @@ continuous_results <- lapply(reg_out_cont, function(output) {
 binary_results[[1]]$model_basic    # Basic model for the first binary outcome
 binary_results[[1]]$coef_r         # Marginal effect coefficient for the first binary outcome
 continuous_results[[1]]$margins_a  # Margins for the first continuous outcome
-continuous_results[[which(reg_out_cont == "arming")]]$coef_r
+continuous_results[[which(reg_out_cont == "arming")]]$margins_a
 
+# # (dated) Control mean para bin variable: split
+# binary_results[[which(reg_out_bin == "attack")]]$margins_r %>%
+#   split(., .$treatment)
+# Control mean para continuous vb: intercept de fixed effects
+
+
+# gets SEs for cont vbs (values inside parameters)
+# most/all are larger than the stata values
+# code (mess) below '#####' is an attempt to get stata values (which use HC1)
+# problem: cov values in vcov matrix for treatment seem to be too low
+# (and for the other vbs too large)
+lapply(reg_out_cont,
+       function(out){
+         continuous_results[[which(reg_out_cont == out)]]$margins_a %>% summary
+       })
+lapply(reg_out_cont,
+       function(out){
+         continuous_results[[which(reg_out_cont == out)]]$margins_r %>% summary
+       })
 
 #############################################################
+
+# install.packages('lmtest','sandwich')
+# library(lmtest)
+# library(sandwich)
+# 
+# install.packages("modelsummary", type = "source")
+# 
+# install.packages("clubSandwich")
+# library(clubSandwich)
+# 
+# test_cov <- continuous_results[[which(reg_out_cont == "arming")]]$model_basic
+# vcovCR(test_cov, cluster = test_cov@frame$treatment, type = "CR1")
+# 
+# vcov(test_cov, type='HC1')
+# 
+# coef(summary(test_cov, vcov=vcov(test_cov, type='HC1')))
+# 
+# library(modelsummary)
+# 
+# modelsummary(
+#   test_cov,
+#   vcov = list(varcov1, varcov2))
 
 
 # Calculate standard deviations for various subgroups
@@ -542,53 +581,71 @@ library(margins)
 library(broom.mixed)
 
 your_data <- conflict_replication1
+your_data_zero <- your_data %>% subset(treatment==0)
+
+# your_data_zero$endowment_scaled <- scale(your_data_zero$endowment)
+# your_data_zero <- your_data_zero %>% mutate(across(all_of(reg_cov), scale))
+# new120 <- your_data_zero$endowment_scaled %>% unique %>% max
+
+your_data_zero$endowment <-
+  relevel(as.factor(your_data_zero$endowment), ref = '120')
 
 # Attacking - without covariates
 mod_r_attack <- glmer(attack ~ endowment + (1 | indep_obs) + (1 | id), 
-                      data = your_data, family = binomial(link = "probit"), 
-                      subset = (treatment == 0))
+                      data = your_data_zero, family = binomial(link = "probit"))
 marg_r_attack <- margins(mod_r_attack, variables = "endowment")
 coef_attack_r <- summary(marg_r_attack)$AME
+
+# parece ter sido sorte dar 0.487etc? pq pra dar isso usa mod_a_attack
+# mas mod_a_attack é com reg_cov
+# e a control mean não usa covariates
+# parece que para bin vbs realmente o MEAN LEVEL é o intercept do model
+# apesar de aqui (endowment, attack, tabela 3) ter dado até sinal diferente
+# try1 <- margins(mod_r_attack, variables='endowment')
+# try1_split <- split(try1, try1$endowment) # split margins between 120 and 80
 
 # Create a formula by pasting the covariates into the model formula
 form_attack <- as.formula(paste("attack ~ endowment +",
                                 paste(reg_cov, collapse = " + "),
                                 "+ (1 | indep_obs) + (1 | id)"))
 
-# Standardize endowment and covariates (if necessary)
-your_data$endowment_scaled <- scale(your_data$endowment)
-# If reg_cov contains other covariates, scale them too
-your_data <- your_data %>%
-  mutate(across(all_of(reg_cov), scale))
-# Refit the model with the scaled variables
-form_attack_scaled <- as.formula(paste("attack ~ endowment_scaled +",
-                                       paste(reg_cov, collapse = " + "),
-                                       "+ (1 | indep_obs) + (1 | id)"))
-mod_a_attack_scaled <- glmer(form_attack_scaled,
-                             data = your_data,
-                             family = binomial(link = "probit"),
-                             subset = (treatment == 0),
-                             control = glmerControl(optimizer = "bobyqa",
-                                                    optCtrl = list(maxfun = 100000)))
+# # Standardize endowment and covariates (if necessary)
+
+# # If reg_cov contains other covariates, scale them too
+
+# # Refit the model with the scaled variables
+# form_attack_scaled <- as.formula(paste("attack ~ endowment_scaled +",
+#                                        paste(reg_cov, collapse = " + "),
+#                                        "+ (1 | indep_obs) + (1 | id)"))
+# mod_a_attack_scaled <- glmer(form_attack_scaled,
+#                              data = your_data,
+#                              family = binomial(link = "probit"),
+#                              subset = (treatment == 0),
+#                              control = glmerControl(optimizer = "bobyqa",
+#                                                     optCtrl = list(maxfun = 100000)))
 
 # Fit the model with the formula
 mod_a_attack <- glmer(form_attack,
-                      data = conflict_replication1,
+                      data = your_data_zero,
                       family = binomial(link = "probit"),
-                      subset = (treatment == 0))
-margins(mod_a_attack,
-        variables = "endowment", atmeans=TRUE)
-summary(marg_a_attack)$AME
-
-# Calculate marginal effects at means
-mod_a_attack_scaled
-marg_a_attack <- margins(mod_a_attack_scaled,
-                         variables = "endowment_scaled", atmeans=TRUE)
+                      control = glmerControl(optimizer = "bobyqa",
+                                                     optCtrl = list(maxfun = 100000)))
+marg_a_attack <- margins(mod_a_attack, variables = "endowment", atmeans=TRUE)
 coef_attack_a <- summary(marg_a_attack)$AME
 
+# margins_r <- margins(model_basic, variables = "treatment")
+# coef_r <- summary(margins_r)$AME[1]
+# continuous_results[[which(reg_out_cont == "arming")]]$coef_r
+
 # Margins by levels of endowment
-marg_rr_attack <- margins(mod_r_attack, at = list(endowment = unique(your_data$endowment)))
-marg_aa_attack <- margins(mod_a_attack, at = list(endowment = unique(your_data$endowment)))
+# marg_rr_attack <- margins(mod_r_attack, at = list(endowment = unique(your_data_zero$endowment)))
+# coef_attack_rr <- summary(marg_rr_attack)$AME
+# 
+# marg_aa_attack <- margins(mod_a_attack,
+#                           at = list(endowment = unique(your_data_zero$endowment)), atmeans=TRUE)
+
+# ACTUAL marg/coef_aa/rr_attack ;; seems like `80` is not reported (cell below
+# check mark on table is empty)
 
 ###################################
 ########## manual endowment #####
@@ -693,35 +750,34 @@ results <- map(reg_out_cont, function(output) {
   coef_a_output <- summary(marg_a_output)$AME
   
   # Margins by levels of endowment
-  marg_rr_output <- margins(mod_r_output, at = list(endowment = unique(your_data_zero$endowment)))
-  marg_aa_output <- margins(mod_a_output, at = list(endowment = unique(your_data_zero$endowment)))
+  # previously marg_aa_output etc
+  control_means <-
+    margins(mod_a_output, variables='endowment', atmeans=TRUE) %>%
+    split(., .$endowment)
   
   # Store results in a list
   list(coef_r_output = coef_r_output, 
        coef_a_output = coef_a_output, 
        marg_a_output = marg_a_output,
        marg_r_output = marg_r_output,
-       marg_rr_output = marg_rr_output, 
-       marg_aa_output = marg_aa_output)
+       control_means = control_means,
+       mod_r_output = mod_r_output)
 })
 
 coef_arming_r <- results[[1]]$coef_r_output
 coef_relative_arming_r <- results[[2]]$coef_r_output
 
-results
-
 ######### prroof test
-results[[which(reg_out_cont == "arm_def")]]$marg_a_output
+results[[which(reg_out_cont == "arm_def")]]$coef_a_output
+
+gl_mod_r_output <- results[[which(reg_out_cont == "arm_att")]]$mod_r_output
+margins_gl_mod_a_output <- margins(gl_mod_a_output, variables='endowment', atmeans=TRUE)
+  split(., .$endowment)
+
 #continuous_results[[which(reg_out_cont == "arming")]]$coef_r
 
-levels(your_data$endowment)
+try1
 
-factor(your_data$endowment, ref = 120)
+margins(mod_a_attack, variables='endowment', atmeans=TRUE) %>% split(., .$endowment)
 
-relevel(as.factor(your_data$endowment), ref = '120')
-
-your_data$endowment
-
-as.factor(your_data$endowment)
-
-as.factor(your_data$endowment, ref=80)
+try1_split <- split(try1, try1$endowment) # split margins between 80 and 120
