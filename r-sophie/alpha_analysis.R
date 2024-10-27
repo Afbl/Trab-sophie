@@ -105,6 +105,64 @@ binary_results[[1]]$coef_r         # Marginal effect coefficient for the first b
 continuous_results[[1]]$margins_a  # Margins for the first continuous outcome
 continuous_results[[which(reg_out_cont == "arming")]]$margins_a
 
+#
+attack_margins <- lapply(c("margins_r", "margins_a"), function(margin) {
+  binary_results[[which(reg_out_bin == 'attack')]][[margin]] %>%
+    summary() %>%
+    select(AME, SE)
+})
+# attack_intercept <-
+#   fixef(binary_results[[which(reg_out_bin == 'attack')]]$model_basic)["(Intercept)"]
+# attack_df <- as.data.frame(attack_margins, attack_intercept)
+
+###
+# lapply(reg_out_cont, function(out){
+#   continuous_results[[which(reg_out_cont == out)]]$margins_a
+# })
+# lapply(reg_out_cont, function(out){
+#   continuous_results[[which(reg_out_cont == out)]]$margins_r
+# })
+# ignores 'rel_arming'
+
+attack_margins <- lapply(c("margins_r", "margins_a"), function(margin) {
+  binary_results[[which(reg_out_bin == 'attack')]][[margin]] %>%
+    summary() %>%
+    select(AME, SE)
+})
+#
+reg_out_cont_thin <- c("arming", "arm_att", "arm_def")
+continuous_margins <- lapply(c("margins_r", "margins_a"), function(margin) {
+  lapply(reg_out_cont_thin, function(out) {
+    continuous_results[[which(reg_out_cont == out)]][[margin]] %>%
+      summary() %>%
+      select(AME, SE)
+  })
+})
+
+###
+
+bin_intercept <-
+  fixef(binary_results[[which(reg_out_bin == 'attack')]]$model_basic)["(Intercept)"]
+# bin_intercept_rep <- data.frame(raw=unlist(bin_intercept_no_rep))
+# bin_intercept_rep <-
+#   bin_intercept_rep[rep(1:nrow(bin_intercept_rep),each=2),]
+cont_intercepts <-
+  lapply(reg_out_cont_thin, function(out){
+    fixef(continuous_results[[which(reg_out_cont == out)]]$model_basic)["(Intercept)"]
+  })
+
+nobs_bin <- nobs(binary_results[[which(reg_out_bin == 'attack')]]$model_basic)
+nobs_cont <- lapply(reg_out_cont_thin, function(out){
+  nobs(continuous_results[[which(reg_out_cont == out)]]$model_basic)
+})
+
+data.frame(nobs_bin, nobs_cont)
+
+# cont_intercepts_rep <- data.frame(raw=unlist(cont_intercepts_no_rep))
+# cont_intercepts_rep <-
+#   cont_intercepts_rep[rep(1:nrow(cont_intercepts_rep),each=2),]
+
+
 # # (dated) Control mean para bin variable: split
 # binary_results[[which(reg_out_bin == "attack")]]$margins_r %>%
 #   split(., .$treatment)
@@ -116,14 +174,14 @@ continuous_results[[which(reg_out_cont == "arming")]]$margins_a
 # code (mess) below '#####' is an attempt to get stata values (which use HC1)
 # problem: cov values in vcov matrix for treatment seem to be too low
 # (and for the other vbs too large)
-lapply(reg_out_cont,
-       function(out){
-         continuous_results[[which(reg_out_cont == out)]]$margins_a %>% summary
-       })
-lapply(reg_out_cont,
-       function(out){
-         continuous_results[[which(reg_out_cont == out)]]$margins_r %>% summary
-       })
+# lapply(reg_out_cont,
+#        function(out){
+#          continuous_results[[which(reg_out_cont == out)]]$margins_a %>% summary
+#        })
+# lapply(reg_out_cont,
+#        function(out){
+#          continuous_results[[which(reg_out_cont == out)]]$margins_r %>% summary
+#        })
 
 #############################################################
 
@@ -150,6 +208,41 @@ lapply(reg_out_cont,
 #   vcov = list(varcov1, varcov2))
 
 
+# # Calculate standard deviations for various subgroups
+# SDarming_UE_def <-
+#   sd(
+#     conflict_replication1$arming[conflict_replication1$treatment == 0 & conflict_replication1$attack == 0],
+#     na.rm = TRUE)
+# SDarming_UE <- sd(conflict_replication1$arming[conflict_replication1$treatment == 0], na.rm = TRUE)
+# SDatt_UE <- sd(conflict_replication1$attack[conflict_replication1$treatment == 0], na.rm = TRUE)
+# SDarming_UE_agg <- sd(conflict_replication1$arming[conflict_replication1$treatment == 0 & conflict_replication1$attack == 1], na.rm = TRUE)
+# 
+# # Calculate effect sizes for attack and arming
+# effect_att_no_control <- -1 * binary_results[[which(reg_out_bin == "attack")]]$coef_r / SDatt_UE
+# cat("Effect Size Attack: (no control)", round(effect_att_no_control, 4), "\n")
+# 
+# effect_att_with_control <- -1 * binary_results[[which(reg_out_bin == "attack")]]$coef_a / SDatt_UE
+# cat("Effect Size Attack: (with controls)", round(effect_att_with_control, 4), "\n")
+# 
+# effect_arming_no_control <- -1 * continuous_results[[which(reg_out_cont == "arming")]]$coef_r / SDarming_UE
+# cat("Effect Size Arming (no control):", round(effect_arming_no_control, 4), "\n")
+# 
+# effect_arming_with_control <- -1 * continuous_results[[which(reg_out_cont == "arming")]]$coef_a / SDarming_UE
+# cat("Effect Size Arming (with controls):", round(effect_arming_with_control, 4), "\n")
+# 
+# effect_att_def_no_control <- -1 * continuous_results[[which(reg_out_cont == "arm_def")]]$coef_r / SDarming_UE_def
+# cat("Effect Size Defensive Arming: (no control)", round(effect_att_def_no_control, 4), "\n")
+# 
+# effect_att_def_with_control <- -1 * continuous_results[[which(reg_out_cont == "arm_def")]]$coef_a / SDarming_UE_def
+# cat("Effect Size Defensive Arming: (control)", round(effect_att_def_with_control, 4), "\n")
+# 
+# effect_att_agg_no_control <- -1 * continuous_results[[which(reg_out_cont == "arm_att")]]$coef_r / SDarming_UE_agg
+# cat("Effect Size Aggressive Arming: (no control)", round(effect_att_agg_no_control, 4), "\n")
+# 
+# effect_att_agg_with_control <- -1 * continuous_results[[which(reg_out_cont == "arm_att")]]$coef_a / SDarming_UE_agg
+# cat("Effect Size Aggressive Arming: (control)", round(effect_att_agg_with_control, 4), "\n")
+
+
 # Calculate standard deviations for various subgroups
 SDarming_UE_def <-
   sd(
@@ -159,63 +252,55 @@ SDarming_UE <- sd(conflict_replication1$arming[conflict_replication1$treatment =
 SDatt_UE <- sd(conflict_replication1$attack[conflict_replication1$treatment == 0], na.rm = TRUE)
 SDarming_UE_agg <- sd(conflict_replication1$arming[conflict_replication1$treatment == 0 & conflict_replication1$attack == 1], na.rm = TRUE)
 
-# Calculate effect sizes for attack and arming
-effect_att_no_control <- -1 * binary_results[[which(reg_out_bin == "attack")]]$coef_r / SDatt_UE
-cat("Effect Size Attack: (no control)", round(effect_att_no_control, 4), "\n")
+# Create a list to store effect sizes
+effect_sizes <- list()
 
-effect_att_with_control <- -1 * binary_results[[which(reg_out_bin == "attack")]]$coef_a / SDatt_UE
-cat("Effect Size Attack: (with controls)", round(effect_att_with_control, 4), "\n")
+# Calculate effect sizes for attack and arming and store them in the list
+effect_sizes$Effect_Size_Attack_No_Control <- round(-1 * binary_results[[which(reg_out_bin == "attack")]]$coef_r / SDatt_UE, 4)
+effect_sizes$Effect_Size_Attack_With_Controls <- round(-1 * binary_results[[which(reg_out_bin == "attack")]]$coef_a / SDatt_UE, 4)
+effect_sizes$Effect_Size_Arming_No_Control <- round(-1 * continuous_results[[which(reg_out_cont == "arming")]]$coef_r / SDarming_UE, 4)
+effect_sizes$Effect_Size_Arming_With_Controls <- round(-1 * continuous_results[[which(reg_out_cont == "arming")]]$coef_a / SDarming_UE, 4)
+effect_sizes$Effect_Size_Defensive_Arming_No_Control <- round(-1 * continuous_results[[which(reg_out_cont == "arm_def")]]$coef_r / SDarming_UE_def, 4)
+effect_sizes$Effect_Size_Defensive_Arming_With_Controls <- round(-1 * continuous_results[[which(reg_out_cont == "arm_def")]]$coef_a / SDarming_UE_def, 4)
+effect_sizes$Effect_Size_Aggressive_Arming_No_Control <- round(-1 * continuous_results[[which(reg_out_cont == "arm_att")]]$coef_r / SDarming_UE_agg, 4)
+effect_sizes$Effect_Size_Aggressive_Arming_With_Controls <- round(-1 * continuous_results[[which(reg_out_cont == "arm_att")]]$coef_a / SDarming_UE_agg, 4)
 
-effect_arming_no_control <- -1 * continuous_results[[which(reg_out_cont == "arming")]]$coef_r / SDarming_UE
-cat("Effect Size Arming (no control):", round(effect_arming_no_control, 4), "\n")
+# Print the effect sizes list
+print(effect_sizes)
 
-effect_arming_with_control <- -1 * continuous_results[[which(reg_out_cont == "arming")]]$coef_a / SDarming_UE
-cat("Effect Size Arming (with controls):", round(effect_arming_with_control, 4), "\n")
-
-effect_att_def_no_control <- -1 * continuous_results[[which(reg_out_cont == "arm_def")]]$coef_r / SDarming_UE_def
-cat("Effect Size Defensive Arming: (no control)", round(effect_att_def_no_control, 4), "\n")
-
-effect_att_def_with_control <- -1 * continuous_results[[which(reg_out_cont == "arm_def")]]$coef_a / SDarming_UE_def
-cat("Effect Size Defensive Arming: (control)", round(effect_att_def_with_control, 4), "\n")
-
-effect_att_agg_no_control <- -1 * continuous_results[[which(reg_out_cont == "arm_att")]]$coef_r / SDarming_UE_agg
-cat("Effect Size Aggressive Arming: (no control)", round(effect_att_agg_no_control, 4), "\n")
-
-effect_att_agg_with_control <- -1 * continuous_results[[which(reg_out_cont == "arm_att")]]$coef_a / SDarming_UE_agg
-cat("Effect Size Aggressive Arming: (control)", round(effect_att_agg_with_control, 4), "\n")
 
 ##
 
-install.packages('texreg')
-install.packages('broom')
-library(texreg)
-library(broom)
-
-# Generate tables for average treatment effects without and with controls
-texreg(
-  l = list(binary_results[[which(reg_out_bin == "attack")]]$margins_r,
-           binary_results[[which(reg_out_bin == "attack")]]$margins_a,
-           continuous_results[[which(reg_out_cont == "arming")]]$margins_r,
-           continuous_results[[which(reg_out_cont == "arming")]]$margins_a),
-  file = "AverageEffects.tex",
-  custom.model.names = c("Attack (no control)", "Attack (with controls)",
-                         "Arming (no control)", "Arming (with controls)"),
-  label = "Table 2: Average Treatment Effects - Control Means",
-  stars = c(0.05, 0.01, 0.001),
-  digits = 3
-)
-
-# Append more results for different choices and additional regressions
-texreg(
-  l = list(binary_results[[which(reg_out_bin == "choose_UP")]]$margins_r,
-           binary_results[[which(reg_out_bin == "choose_UP")]]$margins_a),
-  file = "AverageEffects2.tex",
-  custom.model.names = c("Choose UP (no control)", "Choose UP (with controls)"),
-  append = TRUE,
-  label = "Table S5: Average Treatment Effects",
-  stars = c(0.05, 0.01, 0.001),
-  digits = 3
-)
+# install.packages('texreg')
+# install.packages('broom')
+# library(texreg)
+# library(broom)
+# 
+# # Generate tables for average treatment effects without and with controls
+# texreg(
+#   l = list(binary_results[[which(reg_out_bin == "attack")]]$margins_r,
+#            binary_results[[which(reg_out_bin == "attack")]]$margins_a,
+#            continuous_results[[which(reg_out_cont == "arming")]]$margins_r,
+#            continuous_results[[which(reg_out_cont == "arming")]]$margins_a),
+#   file = "AverageEffects.tex",
+#   custom.model.names = c("Attack (no control)", "Attack (with controls)",
+#                          "Arming (no control)", "Arming (with controls)"),
+#   label = "Table 2: Average Treatment Effects - Control Means",
+#   stars = c(0.05, 0.01, 0.001),
+#   digits = 3
+# )
+# 
+# # Append more results for different choices and additional regressions
+# texreg(
+#   l = list(binary_results[[which(reg_out_bin == "choose_UP")]]$margins_r,
+#            binary_results[[which(reg_out_bin == "choose_UP")]]$margins_a),
+#   file = "AverageEffects2.tex",
+#   custom.model.names = c("Choose UP (no control)", "Choose UP (with controls)"),
+#   append = TRUE,
+#   label = "Table S5: Average Treatment Effects",
+#   stars = c(0.05, 0.01, 0.001),
+#   digits = 3
+# )
 
 ########################################### Beliefs
 
@@ -411,6 +496,7 @@ avg_margins_trust <-
 
 # # Save results for trust to CSV
 # write.csv(summary(margins_trust), file = "Figure_5_data.csv", append = TRUE)
+fixef(binary_results[[which(reg_out_bin == 'attack')]]$model_basic)["(Intercept)"]
 
 # # Marginal effects for 'trust' at specified values (0, 2, 4, ..., 16), holding other variables constant
 # newdata_trust <- data.frame(trust = seq(0, 16, by = 2), riskaverse = mean(data$riskaverse, na.rm = TRUE), lossavers = mean(data$lossavers, na.rm = TRUE))
