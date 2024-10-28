@@ -503,9 +503,15 @@ margins_trust <-
 # hi_trust <-
 #   plot_data_trust$predicted + 1.96 * (plot_data_trust$std.error / sqrt(N_trust))
 
+lo_trust <-
+  plot_data_trust$predicted - abs(plot_data_trust$conf.low)
+hi_trust <-
+  plot_data_trust$predicted + abs(plot_data_trust$conf.high)
+
 plot_data_trust <- margins_trust %>% subset(term=='trust')
 ggplot(plot_data_trust, aes(x = trust, y = predicted, color=group)) +
-  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
+  geom_line() +
+  geom_ribbon(aes(ymin=lo_trust, ymax=hi_trust), alpha = 0.2, fill = "lightblue") +
   labs(
     x = "Amount sent in trust game",
     y = "Probability",
@@ -744,7 +750,7 @@ waffle(data_equal_fig2, rows = 10) +
 ########################################## Figure 3 - development of outcomes
 
 # Collapse (mean) by treatment and period
-collapsed_data <- data %>%
+collapsed_data <- conflict_replication1 %>%
   group_by(treatment, period) %>%
   summarize(
     unarmed_peace = mean(unarmed_peace, na.rm = TRUE),
@@ -753,14 +759,28 @@ collapsed_data <- data %>%
   )
 
 # Replace armed_peace and armed_conflict based on the described operations
-collapsed_data <- collapsed_data %>%
+collapsed_data <-
+  collapsed_data %>%
   mutate(
     armed_peace = armed_peace + unarmed_peace,
     armed_conflict = armed_conflict + armed_peace
-  )
+  ) %>%
+  tidyr::pivot_longer(cols = c("unarmed_peace", "armed_peace", "armed_conflict"),
+               names_to = "state",
+               values_to = "value")
 
-# View the updated collapsed data
-View(collapsed_data)
+
+ggplot(collapsed_data, aes(x = period, y = value, fill = state)) +
+  geom_area() +
+  facet_wrap(~ treatment) +
+  scale_fill_manual(values = c("unarmed_peace" = "lightblue",
+                               "armed_peace" = "orange",
+                               "armed_conflict" = "midnightblue")) +
+  labs(title = "Peace and Conflict States Over Periods",
+       x = "Period",
+       y = "Proportion",
+       fill = "State") +
+  coord_cartesian(ylim = c(0, 1))
 
 
 ########################################## Figure 4 - Frequency of attacking and investments in arms.
@@ -769,57 +789,104 @@ View(collapsed_data)
 # List of variables to loop over
 vars <- c("attack", "arming", "arm_att", "arm_def")
 
+# Initialize an empty dataframe to store the results
+summary_df <- data.frame(
+  variable = character(),
+  endowment = numeric(),
+  mean = numeric(),
+  lower = numeric(),
+  upper = numeric(),
+  stringsAsFactors = FALSE
+)
+
 # Function to calculate mean and confidence intervals
 calculate_summary <- function(data, var, endowment_value) {
   filtered_data <- data %>% filter(endowment == endowment_value)
-
+  
   mean_val <- mean(filtered_data[[var]], na.rm = TRUE)
   sd_val <- sd(filtered_data[[var]], na.rm = TRUE)
   n_val <- sum(!is.na(filtered_data[[var]]))  # Number of non-NA observations
-
+  
   lower_limit <- mean_val - 1.96 * (sd_val / sqrt(n_val))
   upper_limit <- mean_val + 1.96 * (sd_val / sqrt(n_val))
-
+  
   return(list(mean = mean_val, lower = lower_limit, upper = upper_limit))
 }
 
 # Loop over each variable and calculate statistics for both endowment groups
 for (var in vars) {
   # For endowment == 120
-  summary_endowment_120 <- calculate_summary(data, var, endowment_value = 120)
-  cat(paste0(var, " - Mean (120): ", summary_endowment_120$mean, "\n"))
-  cat(paste0(var, " - Lower Limit (120): ", summary_endowment_120$lower, "\n"))
-  cat(paste0(var, " - Upper Limit (120): ", summary_endowment_120$upper, "\n"))
-
+  summary_endowment_120 <- calculate_summary(conflict_replication1, var, endowment_value = 120)
+  summary_df <- rbind(summary_df, data.frame(
+    variable = var,
+    endowment = 120,
+    mean = summary_endowment_120$mean,
+    lower = summary_endowment_120$lower,
+    upper = summary_endowment_120$upper
+  ))
+  
   # For endowment == 80
-  summary_endowment_80 <- calculate_summary(data, var, endowment_value = 80)
-  cat(paste0(var, " - Mean (80): ", summary_endowment_80$mean, "\n"))
-  cat(paste0(var, " - Lower Limit (80): ", summary_endowment_80$lower, "\n"))
-  cat(paste0(var, " - Upper Limit (80): ", summary_endowment_80$upper, "\n"))
+  summary_endowment_80 <- calculate_summary(conflict_replication1, var, endowment_value = 80)
+  summary_df <- rbind(summary_df, data.frame(
+    variable = var,
+    endowment = 80,
+    mean = summary_endowment_80$mean,
+    lower = summary_endowment_80$lower,
+    upper = summary_endowment_80$upper
+  ))
 }
 
+summary_df <-
+  summary_df %>%
+  mutate(endowment = ifelse(endowment == 120, "advantaged", "disadvantaged"))
 
-################################################# Avg endowment effects
+fig4_data_attack <-
+  summary_df %>%
+  subset(variable=='attack')
+fig4_data_inv <-
+  summary_df %>%
+  subset(variable!='attack')
 
-install.packages(c("lme4", "margins", "broom.mixed"))
+# Create the plot
+ggplot(fig4_data_attack, aes(x = endowment, y = mean)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.6, alpha = 0.7) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), 
+                position = position_dodge(0.9), width = 0.2) +  # Error bars
+  labs(title = "Fig 4 - Attack",
+       x = "",
+       y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))  # Adjust x-axis labels as needed
 
-library(lme4)
-library(margins)
+
+ggplot(fig4_data_inv, aes(x = variable, y = mean, fill = endowment)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +  # Bar plot with dodged positions for treatments
+  geom_errorbar(aes(ymin = lower, ymax = upper), 
+                position = position_dodge(0.7), width = 0.2) +  # Error bars with dodged positions
+  labs(title = "Fig 4 - Inv",
+       x = "",
+       y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+
+################################################# Avg endowment effects - bin
+
+# install.packages(c("lme4", "margins", "broom.mixed"))
+
 library(broom.mixed)
 
-your_data <- conflict_replication1
-your_data_zero <- your_data %>% subset(treatment==0)
+untreated_folk <- conflict_replication1 %>% subset(treatment==0)
 
 # your_data_zero$endowment_scaled <- scale(your_data_zero$endowment)
 # your_data_zero <- your_data_zero %>% mutate(across(all_of(reg_cov), scale))
 # new120 <- your_data_zero$endowment_scaled %>% unique %>% max
 
-your_data_zero$endowment <-
-  relevel(as.factor(your_data_zero$endowment), ref = '120')
+untreated_folk$endowment <-
+  relevel(as.factor(untreated_folk$endowment), ref = '120')
 
 # Attacking - without covariates
 mod_r_attack <- glmer(attack ~ endowment + (1 | indep_obs) + (1 | id), 
-                      data = your_data_zero, family = binomial(link = "probit"))
+                      data = untreated_folk, family = binomial(link = "probit"))
 marg_r_attack <- margins(mod_r_attack, variables = "endowment")
 coef_attack_r <- summary(marg_r_attack)$AME
 
@@ -853,7 +920,7 @@ form_attack <- as.formula(paste("attack ~ endowment +",
 
 # Fit the model with the formula
 mod_a_attack <- glmer(form_attack,
-                      data = your_data_zero,
+                      data = untreated_folk,
                       family = binomial(link = "probit"),
                       control = glmerControl(optimizer = "bobyqa",
                                                      optCtrl = list(maxfun = 100000)))
@@ -874,107 +941,34 @@ coef_attack_a <- summary(marg_a_attack)$AME
 # ACTUAL marg/coef_aa/rr_attack ;; seems like `80` is not reported (cell below
 # check mark on table is empty)
 
-###################################
-########## manual endowment #####
-###################################
-# Define a helper function to fit the models, compute margins, and store results
-fit_model_endowment <- function(output, formula_basic, formula_full,
-                      data, margin_vb, model_type = "binary") {
-  
-  if (model_type == "binary") {
-    model_basic <- glmer(formula_basic, data = data, family = binomial(link = "probit"))
-    model_full  <- glmer(formula_full, data = data, family = binomial(link = "probit"))
-  } else {
-    model_basic <- lmer(formula_basic, REML = FALSE, data = data)
-    model_full  <- lmer(formula_full, REML = FALSE, data = data)
-  }
-  
-  # Marginal effects
-  margins_r <- margins(model_basic, variables = margin_vb)
-  margins_a <- margins(model_full, variables = margin_vb, atmeans = TRUE)
-  
-  # Marginal effects over treatment
-  margins_rr <- margins(model_basic, variables = margin_vb, over = margin_vb)
-  margins_aa <- margins(model_full, variables = margin_vb, over = margin_vb, atmeans = TRUE)
-  
-  # Store coefficients and marginal effects
-  coef_r <- summary(margins_r)$AME[1]
-  coef_a <- summary(margins_a)$AME[1]
-  
-  list(
-    model_basic = model_basic,
-    model_full = model_full,
-    margins_r = margins_r,
-    margins_a = margins_a,
-    margins_rr = margins_rr,
-    margins_aa = margins_aa,
-    coef_r = coef_r,
-    coef_a = coef_a
-  )
-}
+################################################# Avg endowment effects - cont
 
-# Prepare the basic and full formulas for binary and continuous outcomes
-prepare_formulas <- function(output, reg_cov) {
-  formula_basic <- as.formula(paste(output, "~ endowment + attack + (1|indep_obs) + (1|id)"))
-  formula_full  <- as.formula(paste(output, "~ endowment + attack +", paste(reg_cov, collapse = "+"),
-                                    "+ (1|indep_obs) + (1|id)"))
-  list(formula_basic = formula_basic, formula_full = formula_full)
-}
-
-# Apply the models for binary outcomes
-binary_results <- lapply(reg_out_bin, function(output) {
-  formulas <- prepare_formulas(output, reg_cov)
-  fit_model(output, formulas$formula_basic, formulas$formula_full, conflict_replication1, model_type = "binary")
-})
-
-treat0 <- conflict_replication1 %>% subset(treatment==0)
-
-# Apply the models for continuous outcomes
-continuous_results <-
-  lapply(reg_out_cont, function(output) {
-    formulas <- prepare_formulas(output, reg_cov)
-    fit_model_endowment(output,
-                        formulas$formula_basic,
-                        formulas$formula_full,
-                        conflict_replication1,
-                        model_type = "continuous",
-                        margin_vb='endowment')
-})
-
-# The results are stored in lists, with each element corresponding to a specific output variable
-# You can access them like this:
-binary_results[[1]]$model_basic    # Basic model for the first binary outcome
-binary_results[[1]]$coef_r         # Marginal effect coefficient for the first binary outcome
-continuous_results[[1]]$margins_a  # Margins for the first continuous outcome
-continuous_results[[which(reg_out_cont == "arm_def")]]$coef_a
-
-#########
-####### Arming & Relative Arming
-#########
-
-install.packages('purrr')
+# install.packages('purrr')
+library(lme4)
+library(margins)
 library(purrr)
+library(dplyr)
 
-your_data <- conflict_replication1
-your_data_zero <- your_data %>% subset(treatment==0)
-your_data_zero$endowment <- relevel(as.factor(your_data_zero$endowment), ref = '120')
-
-results <- map(reg_out_cont, function(output) {
+cont_endowment_results <- map(reg_out_cont, function(output) {
   # Without covariates
   mod_r_output <- lmer(as.formula(paste0(output,
                                          " ~ endowment + (1 | indep_obs) + (1 | id)")), 
-                       data = your_data_zero,
+                       data = untreated_folk,
                        REML = FALSE)
   marg_r_output <- margins(mod_r_output, variables = "endowment")
-  coef_r_output <- summary(marg_r_output)$AME
+  summary_r_output <- summary(marg_r_output)
+  coefSE_r_output <- summary_r_output %>% select(AME, SE)
   
   # With covariates
-  form_output <- as.formula(paste(output, "~ endowment +", paste(reg_cov, collapse = " + "), "+ (1 | indep_obs) + (1 | id)"))
+  form_output <- as.formula(paste(output, "~ endowment +",
+                                  paste(reg_cov, collapse = " + "),
+                                  "+ (1 | indep_obs) + (1 | id)"))
   mod_a_output <- lmer(form_output,
-                       data = your_data_zero,
+                       data = untreated_folk,
                        REML = FALSE)
   marg_a_output <- margins(mod_a_output, variables = "endowment", atmeans=TRUE)
-  coef_a_output <- summary(marg_a_output)$AME
+  summary_a_output <- summary(marg_a_output)
+  coefSE_a_output <- summary_a_output %>% select(AME, SE)
   
   # Margins by levels of endowment
   # previously marg_aa_output etc
@@ -983,28 +977,53 @@ results <- map(reg_out_cont, function(output) {
     split(., .$endowment)
   
   # Store results in a list
-  list(coef_r_output = coef_r_output, 
-       coef_a_output = coef_a_output, 
+  list(coefSE_r_output = coefSE_r_output, 
+       coefSE_a_output = coefSE_a_output, 
        marg_a_output = marg_a_output,
        marg_r_output = marg_r_output,
-       control_means = control_means,
+       summary_a_output = summary_a_output,
+       summary_r_output = summary_r_output,
+       mod_a_output = mod_a_output,
        mod_r_output = mod_r_output)
 })
 
-coef_arming_r <- results[[1]]$coef_r_output
-coef_relative_arming_r <- results[[2]]$coef_r_output
+# coef_arming_r <- results[[1]]$coef_r_output
+# coef_relative_arming_r <- results[[2]]$coef_r_output
+# 
+# ######### prroof test
+# results[[which(reg_out_cont == "arm_def")]]$coef_a_output
 
-######### prroof test
-results[[which(reg_out_cont == "arm_def")]]$coef_a_output
+cont_endowment_nobs <-
+  lapply(reg_out_cont_thin,function(out){
+  nobs(cont_endowment_results[[which(reg_out_cont == out)]]$mod_r_output)
+})
+cont_endowment_intercepts <-
+  lapply(reg_out_cont_thin,function(out){
+    fixef(cont_endowment_results[[which(reg_out_cont == out)]]$mod_r_output)["(Intercept)"]
+  })
+cont_endowment_df <-
+  data.frame(intercepts=unlist(cont_endowment_intercepts),
+             nobs=unlist(cont_endowment_nobs))
 
-gl_mod_r_output <- results[[which(reg_out_cont == "arm_att")]]$mod_r_output
-margins_gl_mod_a_output <- margins(gl_mod_a_output, variables='endowment', atmeans=TRUE)
-  split(., .$endowment)
+cont_endowment_r_coefSE <-
+  lapply(reg_out_cont_thin,function(out){
+    cont_endowment_results[[which(reg_out_cont == out)]]$coefSE_r_output
+  })
+AME_SE_r_cont <- lapply(c(1:3), function(e){
+  cont_endowment_r_coefSE[[e]] %>%
+    mutate(AME_SE_r=paste(AME, SE, sep = " / ")) %>%
+    select(AME_SE_r)
+})
 
-#continuous_results[[which(reg_out_cont == "arming")]]$coef_r
+cont_endowment_a_coefSE <-
+  lapply(reg_out_cont_thin,function(out){
+    cont_endowment_results[[which(reg_out_cont == out)]]$coefSE_a_output
+  })
+AME_SE_a_cont <- lapply(c(1:3), function(e){
+  cont_endowment_a_coefSE[[e]] %>%
+    mutate(AME_SE_a=paste(AME, SE, sep = " / ")) %>%
+    select(AME_SE_a)
+})
 
-try1
-
-margins(mod_a_attack, variables='endowment', atmeans=TRUE) %>% split(., .$endowment)
-
-try1_split <- split(try1, try1$endowment) # split margins between 80 and 120
+cont_endowment_df$AME_SE_r <- AME_SE_r_cont
+cont_endowment_df$AME_SE_a <- AME_SE_a_cont
