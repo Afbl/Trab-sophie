@@ -266,7 +266,7 @@ effect_sizes$Effect_Size_Aggressive_Arming_No_Control <- round(-1 * continuous_r
 effect_sizes$Effect_Size_Aggressive_Arming_With_Controls <- round(-1 * continuous_results[[which(reg_out_cont == "arm_att")]]$coef_a / SDarming_UE_agg, 4)
 
 # Print the effect sizes list
-print(effect_sizes)
+View(data.frame(effect_sizes=unlist(effect_sizes)))
 
 
 ##
@@ -461,13 +461,18 @@ print(effect_sizes)
 # belief_binary_results[[1]]$coef_r         # Marginal effect coefficient for the first binary outcome
 # belief_continuous_results[[1]]$margins_a  # Margins for the first continuous outcome
 
-############################################# Multinomial Regression
+############################################# Multinomial Regression ~ Figure 5
 
-install.packages('nnet')
-install.packages('marginaleffects')
+
+#### !!!!!!!!!!!!!!!!!! TODO
+###### EXTRACT VALUES FOR PLOT
+###### PLOT
+
+#install.packages('nnet')
+#install.packages('marginaleffects')
 library(nnet)    # for multinom
-library(margins) # for marginal effects
-library(dplyr)   # for data manipulation
+#library(margins) # for marginal effects
+#library(dplyr)   # for data manipulation
 library(marginaleffects)
 
 # Clear previous estimates
@@ -478,84 +483,162 @@ mlogit_data <- conflict_replication1 %>% filter(Strategies3 != 3)
 # subset function yields the same
 # madiamda <- conflict_replication1 %>% subset(Strategies3 != 3)
 
+mlogit_data$Strategies3 <- relevel(as.factor(mlogit_data$Strategies3), ref = 2)
+
 # Multinomial regression with trust, riskaverse, and lossavers
 mlogit_model <- multinom(Strategies3 ~ trust + riskaverse + lossavers,
-                         data = mlogit_data)
+                         data = mlogit_data,
+                         model=TRUE)
 
 # marginal_effects(model_trust)
 # # Marginal effects for 'trust' at specified values, holding other variables at means
 # margins_trust <- margins(model_trust, at = list(trust = seq(0, 16, by = 2)))
 margins_trust <-
   slopes(mlogit_model,
-         newdata = datagrid(trust = seq(0, 16, by = 2)),
-         type = "probs")
-avg_margins_trust <-
-  avg_slopes(mlogit_model,
-         newdata = datagrid(trust = seq(0, 16, by = 2)),
-         type = "probs")
+         newdata = datagrid(trust = seq(0, 16, by = 2)))
+
+# N_trust <- length(plot_data_trust$predicted)
+# lo_trust <-
+#   plot_data_trust$predicted - 1.96 * (plot_data_trust$std.error / sqrt(N_trust))
+# hi_trust <-
+#   plot_data_trust$predicted + 1.96 * (plot_data_trust$std.error / sqrt(N_trust))
+
+plot_data_trust <- margins_trust %>% subset(term=='trust')
+ggplot(plot_data_trust, aes(x = trust, y = predicted, color=group)) +
+  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
+  labs(
+    x = "Amount sent in trust game",
+    y = "Probability",
+    color = "Term",
+    title = "Trust"
+  ) +
+  theme_minimal()
+
+##
+
+margins_risk <-
+  slopes(mlogit_model,
+         newdata = datagrid(riskaverse = seq(0., 1., by = 0.1)))
+
+plot_data_risk <- margins_risk %>% subset(term=='riskaverse')
+ggplot(plot_data_risk, aes(x = riskaverse, y = predicted, color=group)) +
+  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
+  labs(
+    x = "Relative risk aversion",
+    y = "Probability",
+    color = "Term",
+    title = "Risk aversion"
+  ) +
+  theme_minimal()
+
+##
+
+margins_loss <-
+  slopes(mlogit_model,
+         newdata = datagrid(lossavers = seq(0., 1., by = 0.1)))
+
+plot_data_loss <- margins_loss %>% subset(term=='lossavers')
+ggplot(plot_data_loss, aes(x = lossavers, y = predicted, color=group)) +
+  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
+  labs(
+    x = "Relative Loss aversion",
+    y = "Probability",
+    color = "Term",
+    title = "Loss aversion"
+  ) +
+  theme_minimal()
 
 # # Save results for trust to CSV
-# write.csv(summary(margins_trust), file = "Figure_5_data.csv", append = TRUE)
-fixef(binary_results[[which(reg_out_bin == 'attack')]]$model_basic)["(Intercept)"]
-
-# # Marginal effects for 'trust' at specified values (0, 2, 4, ..., 16), holding other variables constant
-# newdata_trust <- data.frame(trust = seq(0, 16, by = 2), riskaverse = mean(data$riskaverse, na.rm = TRUE), lossavers = mean(data$lossavers, na.rm = TRUE))
-# margins_trust <- marginal_effects(model_trust, data = newdata_trust)
-
-# Save results for trust to CSV
-write.csv(margins_trust, file = "Figure_5_data_trust.csv")
-write.csv(avg_margins_trust, file = "avg_Figure_5_data_trust.csv")
+# write.csv(margins_trust, file = "Figure_5_data_trust.csv")
+# # write.csv(avg_margins_trust, file = "avg_Figure_5_data_trust.csv")
 
 ########### loss
 
-# Marginal effects for 'riskaverse' at specified values, holding other variables at means
-margins_riskaverse <-
-  slopes(mlogit_model,
-         newdata = datagrid(riskaverse = seq(0, 1, by = 0.1)),
-         type = "probs")
-avg_margins_riskaverse <-
-  avg_slopes(mlogit_model,
-         newdata = datagrid(riskaverse = seq(0, 1, by = 0.1)),
-         type = "probs")
-
-# Append results for riskaverse to CSV
-write.csv(margins_riskaverse, file = "Figure_5_data_risk.csv")
-write.csv(avg_margins_riskaverse, file = "avg_Figure_5_data_risk.csv")
-
-###########
-
-# Marginal effects for 'lossavers' at specified values, holding other variables at means
-margins_lossavers <-
-  slopes(mlogit_model,
-         newdata = datagrid(lossavers = seq(0, 1, by = 0.1)),
-         type = "probs")
-avg_margins_lossavers <-
-  avg_slopes(mlogit_model,
-         newdata = datagrid(lossavers = seq(0, 1, by = 0.1)),
-         type = "probs")
-
-# Append results for lossavers to CSV
-write.csv(margins_lossavers, file = "Figure_5_data_loss.csv")
-write.csv(avg_margins_lossavers, file = "avg_Figure_5_data_loss.csv")
-
-# ########## binder
-#
-# thin_trust <- margins_trust %>% select('group','term','trust','std.error')
-# thin_risk <- margins_riskaverse %>% select('group','term','trust','std.error')
-# thin_loss <- margins_lossavers %>% select('group','term','trust','std.error')
-#
-# thin_loss
+# # Marginal effects for 'riskaverse' at specified values, holding other variables at means
+# margins_riskaverse <-
+#   slopes(mlogit_model,
+#          newdata = datagrid(riskaverse = seq(0, 1, by = 0.1)),
+#          type = "probs")
+# # avg_margins_riskaverse <-
+# #   avg_slopes(mlogit_model,
+# #          newdata = datagrid(riskaverse = seq(0, 1, by = 0.1)),
+# #          type = "probs")
+# 
+# # Append results for riskaverse to CSV
+# write.csv(margins_riskaverse, file = "Figure_5_data_risk.csv")
+# # write.csv(avg_margins_riskaverse, file = "avg_Figure_5_data_risk.csv")
+# 
+# ###########
+# 
+# # Marginal effects for 'lossavers' at specified values, holding other variables at means
+# margins_lossavers <-
+#   slopes(mlogit_model,
+#          newdata = datagrid(lossavers = seq(0, 1, by = 0.1)),
+#          type = "probs")
+# # avg_margins_lossavers <-
+# #   avg_slopes(mlogit_model,
+# #          newdata = datagrid(lossavers = seq(0, 1, by = 0.1)),
+# #          type = "probs")
+# 
+# # Append results for lossavers to CSV
 # write.csv(margins_lossavers, file = "Figure_5_data_loss.csv")
-
-#
-# # Final multinomial regression without exporting the result
-# final_model <- multinom(Strategies3 ~ trust + riskaverse + lossavers, data = data)
-# final_model_rrr <- exp(coef(final_model))  # Relative risk ratios (equivalent to rrr in Stata)
-# View(summary(final_model))
+# # write.csv(avg_margins_lossavers, file = "avg_Figure_5_data_loss.csv")
+# 
+# # ########## binder
+# #
+# # thin_trust <- margins_trust %>% select('group','term','trust','std.error')
+# # thin_risk <- margins_riskaverse %>% select('group','term','trust','std.error')
+# # thin_loss <- margins_lossavers %>% select('group','term','trust','std.error')
+# #
+# # thin_loss
+# # write.csv(margins_lossavers, file = "Figure_5_data_loss.csv")
+# 
+# #
+# # # Final multinomial regression without exporting the result
+# # final_model <- multinom(Strategies3 ~ trust + riskaverse + lossavers, data = data)
+# # final_model_rrr <- exp(coef(final_model))  # Relative risk ratios (equivalent to rrr in Stata)
+# # View(summary(final_model))
 
 ########################################## Figure 1
 
-data <- conflict_replication1
+# data <- conflict_replication1
+# 
+# # List of variables to loop over
+# vars <- c("attack", "arming", "arm_att", "arm_def")
+# 
+# # Function to calculate mean and confidence intervals
+# calculate_summary <- function(data, var, treatment_value) {
+#   filtered_data <- data %>% filter(treatment == treatment_value)
+# 
+#   mean_val <- mean(filtered_data[[var]], na.rm = TRUE)
+#   sd_val <- sd(filtered_data[[var]], na.rm = TRUE)
+#   n_val <- sum(!is.na(filtered_data[[var]]))  # Number of non-NA observations
+# 
+#   lower_limit <- mean_val - 1.96 * (sd_val / sqrt(n_val))
+#   upper_limit <- mean_val + 1.96 * (sd_val / sqrt(n_val))
+# 
+#   return(list(mean = mean_val, lower = lower_limit, upper = upper_limit))
+# }
+# 
+# # Loop over each variable and calculate statistics for both treatment groups
+# for (var in vars) {
+#   # For treatment == 0 (UNEQUAL)
+#   summary_treatment_0 <- calculate_summary(data, var, treatment_value = 0)
+#   cat(paste0(var, " - Mean (UNEQUAL): ", summary_treatment_0$mean, "\n"))
+#   cat(paste0(var, " - Lower Limit (UNEQUAL): ", summary_treatment_0$lower, "\n"))
+#   cat(paste0(var, " - Upper Limit (UNEQUAL): ", summary_treatment_0$upper, "\n"))
+# 
+#   # For treatment == 1 (EQUAL)
+#   summary_treatment_1 <- calculate_summary(data, var, treatment_value = 1)
+#   cat(paste0(var, " - Mean (EQUAL): ", summary_treatment_1$mean, "\n"))
+#   cat(paste0(var, " - Lower Limit (EQUAL): ", summary_treatment_1$lower, "\n"))
+#   cat(paste0(var, " - Upper Limit (EQUAL): ", summary_treatment_1$upper, "\n"))
+# }
+
+
+##### try2
+
+library(dplyr)
 
 # List of variables to loop over
 vars <- c("attack", "arming", "arm_att", "arm_def")
@@ -563,42 +646,100 @@ vars <- c("attack", "arming", "arm_att", "arm_def")
 # Function to calculate mean and confidence intervals
 calculate_summary <- function(data, var, treatment_value) {
   filtered_data <- data %>% filter(treatment == treatment_value)
-
+  
   mean_val <- mean(filtered_data[[var]], na.rm = TRUE)
   sd_val <- sd(filtered_data[[var]], na.rm = TRUE)
   n_val <- sum(!is.na(filtered_data[[var]]))  # Number of non-NA observations
-
+  
   lower_limit <- mean_val - 1.96 * (sd_val / sqrt(n_val))
   upper_limit <- mean_val + 1.96 * (sd_val / sqrt(n_val))
-
-  return(list(mean = mean_val, lower = lower_limit, upper = upper_limit))
+  
+  return(list(mean = mean_val, lower = lower_limit, upper = upper_limit, n = n_val))
 }
+
+# Initialize an empty list to store results
+results_list <- list()
 
 # Loop over each variable and calculate statistics for both treatment groups
 for (var in vars) {
   # For treatment == 0 (UNEQUAL)
-  summary_treatment_0 <- calculate_summary(data, var, treatment_value = 0)
-  cat(paste0(var, " - Mean (UNEQUAL): ", summary_treatment_0$mean, "\n"))
-  cat(paste0(var, " - Lower Limit (UNEQUAL): ", summary_treatment_0$lower, "\n"))
-  cat(paste0(var, " - Upper Limit (UNEQUAL): ", summary_treatment_0$upper, "\n"))
-
+  summary_treatment_0 <- calculate_summary(conflict_replication1, var, treatment_value = 0)
+  
   # For treatment == 1 (EQUAL)
-  summary_treatment_1 <- calculate_summary(data, var, treatment_value = 1)
-  cat(paste0(var, " - Mean (EQUAL): ", summary_treatment_1$mean, "\n"))
-  cat(paste0(var, " - Lower Limit (EQUAL): ", summary_treatment_1$lower, "\n"))
-  cat(paste0(var, " - Upper Limit (EQUAL): ", summary_treatment_1$upper, "\n"))
+  summary_treatment_1 <- calculate_summary(conflict_replication1, var, treatment_value = 1)
+  
+  # Organize results into a dataframe
+  results_list[[var]] <- data.frame(
+    Variable = var,
+    Treatment = c("UNEQUAL", "EQUAL"),
+    Mean = c(summary_treatment_0$mean, summary_treatment_1$mean),
+    Lower_Limit = c(summary_treatment_0$lower, summary_treatment_1$lower),
+    Upper_Limit = c(summary_treatment_0$upper, summary_treatment_1$upper),
+    N = c(summary_treatment_0$n, summary_treatment_1$n)
+  )
 }
 
+# Combine all results into a single dataframe
+final_results <- do.call(rbind, results_list)
+
+# Print the final dataframe
+attack_fig1 <- final_results %>% subset(Variable=='attack')
+invest_fig1 <- final_results %>% subset(Variable!='attack')
+
+ggplot(invest_fig1, aes(x = Variable, y = Mean, fill = Treatment)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +  # Bar plot with dodged positions for treatments
+  geom_errorbar(aes(ymin = Lower_Limit, ymax = Upper_Limit), 
+                position = position_dodge(0.7), width = 0.2) +  # Error bars with dodged positions
+  labs(title = "Mean Values with Confidence Intervals by Variable and Treatment",
+       x = "Variable",
+       y = "Mean Value") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+
+library(ggpattern)
+# Create the subset
+attack_fig1 <- final_results %>% subset(Variable == 'attack')
+
+# Create the plot
+ggplot(attack_fig1, aes(x = Treatment, y = Mean, linetype = Treatment)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.6, alpha = 0.7) +  # Bar plot for attack
+  geom_col_pattern(aes(pattern=Treatment)) +
+  scale_pattern_manual(values=c('crosshatch', 'wave')) +
+  geom_errorbar(aes(ymin = Lower_Limit, ymax = Upper_Limit), 
+                position = position_dodge(0.9), width = 0.2) +  # Error bars
+  labs(title = "Mean Attack Values with Confidence Intervals by Treatment",
+       x = "Treatment",
+       y = "Mean Value") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))  # Adjust x-axis labels as needed
 
 ########################################## Figure 2 - choices
 
-# For treatment == 1
-data_treatment_1 <- data %>% filter(treatment == 1) %>% select(period, id, Strategies3, treatment)
-View(data_treatment_1)
+# install.packages('waffle')
+library(waffle)
 
-# For treatment == 0
-data_treatment_0 <- data %>% filter(treatment == 0) %>% select(period, id, Strategies3, treatment)
-View(data_treatment_0)
+# Fig2 unequal
+data_unequal_fig2 <-
+  conflict_replication1 %>%
+  filter(treatment == 1) %>%
+  count(Strategies3)
+
+data_unequal_fig2$n <- data_unequal_fig2$n * 100 / sum(data_unequal_fig2$n)
+
+waffle(data_unequal_fig2, rows = 10) +
+labs(title = "Fig 2 - Unequal")
+
+#
+## Fig2 equal
+data_equal_fig2 <-
+  conflict_replication1 %>%
+  filter(treatment == 0) %>%
+  count(Strategies3)
+
+data_equal_fig2$n <- data_equal_fig2$n * 100 / sum(data_equal_fig2$n)
+
+waffle(data_equal_fig2, rows = 10) +
+  labs(title = "Fig 2 - Equal")
 
 ########################################## Figure 3 - development of outcomes
 
