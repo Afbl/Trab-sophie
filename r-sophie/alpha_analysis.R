@@ -335,28 +335,26 @@ mlogit_model <- multinom(Strategies3 ~ trust + riskaverse + lossavers,
 # margins_trust <- margins(model_trust, at = list(trust = seq(0, 16, by = 2)))
 margins_trust <-
   slopes(mlogit_model,
-         newdata = datagrid(trust = seq(0, 16, by = 2)))
-
-# N_trust <- length(plot_data_trust$predicted)
-# lo_trust <-
-#   plot_data_trust$predicted - 1.96 * (plot_data_trust$std.error / sqrt(N_trust))
-# hi_trust <-
-#   plot_data_trust$predicted + 1.96 * (plot_data_trust$std.error / sqrt(N_trust))
+         newdata = datagrid(trust = seq(0, 16, by = 2))) %>%
+  mutate(group = recode(group,
+                        "2" = "AP",
+                        "4" = "AC",
+                        "1" = "UP"))
 
 plot_data_trust <- margins_trust %>% subset(term=='trust')
 
-lo_trust <-
-  plot_data_trust$predicted - abs(plot_data_trust$conf.low)
-hi_trust <-
-  plot_data_trust$predicted + abs(plot_data_trust$conf.high)
+# lo_trust <-
+#   plot_data_trust$predicted - abs(plot_data_trust$conf.low)
+# hi_trust <-
+#   plot_data_trust$predicted + abs(plot_data_trust$conf.high)
 
 ggplot(plot_data_trust, aes(x = trust, y = predicted, color=group)) +
   geom_line() +
-  geom_ribbon(aes(ymin=lo_trust, ymax=hi_trust), alpha = 0.2, fill = "lightblue") +
+  # geom_ribbon(aes(ymin=lo_trust, ymax=hi_trust), alpha = 0.2, fill = "lightblue") +
   labs(
     x = "Amount sent in trust game",
     y = "Probability",
-    color = "Term",
+    color = "Strategy",
     title = "Trust"
   )
 
@@ -364,7 +362,11 @@ ggplot(plot_data_trust, aes(x = trust, y = predicted, color=group)) +
 
 margins_risk <-
   slopes(mlogit_model,
-         newdata = datagrid(riskaverse = seq(0., 1., by = 0.1)))
+         newdata = datagrid(riskaverse = seq(0., 1., by = 0.1))) %>%
+  mutate(group = recode(group,
+                        "2" = "AP",
+                        "4" = "AC",
+                        "1" = "UP"))
 
 plot_data_risk <- margins_risk %>% subset(term=='riskaverse')
 
@@ -374,11 +376,12 @@ plot_data_risk <- margins_risk %>% subset(term=='riskaverse')
 #   plot_data_risk$predicted + plot_data_risk$conf.high
 
 ggplot(plot_data_risk, aes(x = riskaverse, y = predicted, color=group)) +
-  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
+  geom_line() +
+#  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
   labs(
     x = "Relative risk aversion",
     y = "Probability",
-    color = "Term",
+    color = "Strategy",
     title = "Risk aversion"
   )
 
@@ -386,16 +389,21 @@ ggplot(plot_data_risk, aes(x = riskaverse, y = predicted, color=group)) +
 
 margins_loss <-
   slopes(mlogit_model,
-         newdata = datagrid(lossavers = seq(0., 1., by = 0.1)))
+         newdata = datagrid(lossavers = seq(0., 1., by = 0.1))) %>%
+  mutate(group = recode(group,
+                        "2" = "AP",
+                        "4" = "AC",
+                        "1" = "UP"))
 
 plot_data_loss <- margins_loss %>% subset(term=='lossavers')
 
 ggplot(plot_data_loss, aes(x = lossavers, y = predicted, color=group)) +
-  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
+  geom_line() +
+#  geom_ribbon(aes(ymin=predicted_lo, ymax=predicted_hi), alpha = 0.2, fill = "lightblue") +
   labs(
     x = "Relative Loss aversion",
     y = "Probability",
-    color = "Term",
+    color = "Strategy",
     title = "Loss aversion"
   )
 
