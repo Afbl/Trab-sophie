@@ -1,0 +1,204 @@
+\documentclass[11pt]{beamer}
+\usetheme{Warsaw}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\author{Andre Lelis and Renan Andrade}
+\title{Peace in an unequal world?}
+%\setbeamercovered{transparent} 
+%\setbeamertemplate{navigation symbols}{} 
+%\logo{} 
+%\institute{EPGE - FGV} 
+%\subject{} 
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+%\begin{frame}
+%\tableofcontents
+%\end{frame}
+
+\begin{frame}{Paper}
+
+"Peace in an unequal world? Experimental evidence on the relationship between inequality and conflict in a guns-vs-butter setting"
+
+Games and Economic Behavior,
+Volume 147,2024,Pages 74-87\\
+
+Authors: Alexandra Baier, Sophia Seelos, Thomas Rittmannsberger
+\end{frame}
+
+\begin{frame}{Motivation}
+
+\begin{itemize}
+\item Many governments spend significant portion of the income on military and security forces.
+\item These investments are often sunk costs. These resources could be used in other essential social and economics needs.
+\item Is unarmed peace feasible?
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Model}
+
+\begin{itemize}
+\item Garfinkel and Syropoulos (2021)
+
+\item Two players ($i= A,B$). Each player divides his resources $R_{i}$ between $X_{i}$(production) and $G_{i}$(arming) such that  $R_{i} = X_{i} + G_{i}$. 
+
+\item If neither player attack, peace is sustained and both consumer their own production
+
+\item If at least one attack, then the sum of production constitutes the contestable output $\bar{X} = X_{1} + X_{2}$
+
+\item There is $\beta \in [0,1)$ such that $\beta$ is the survival rate of production.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Model}
+
+\begin{itemize}
+\item Probability of winning the conflict $\Phi_{i} = \Phi_{i}(G_{i},G_{j}) = \frac{G_{i}}{\bar{G}}$
+
+\item $U^{P}_{i} = X_{i}$
+
+\item $U^{C}_{i} = \Phi_{i} \beta \bar{X}$
+
+\item Nash Equilibrium? Conflict is always a NE!
+
+\item If $\beta \geq 0.5$ no stable NE in peace. If $\beta <0.5$, a stable NE in unarmed peace can exist, depending on distribution of resources.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Experiment}
+\begin{itemize}
+\item Measure trust and trustworthinesse, loss aversion and preferences toward preference and risk.
+
+\item Conflict game: Seven rounds, never repeat opponent
+\begin{enumerate}
+\item Players decide the action(conflict or not) and after this decide how to allocate their endowments.
+\item Tell the results.
+\end{enumerate}
+
+\item In the case of conflict, $\beta = 0.45$
+
+\item Two different treatment: 
+
+\begin{enumerate} 
+\item Equal (100 tokens for each player) 
+\item Unequal (120 tokens x 80 tokens)
+
+\end{enumerate}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\textbf{Hypothesis 1} Compared to a situation where the distribution of resources is unequal, we expect players to start fewer conflicts when
+resources are distributed equally among them.
+
+
+\textbf{Hypothesis 2}. Compared to a situation where the distribution of resources is unequal, we expect players to invest fewer resources in
+arms when resources are distributed equally among them
+\end{frame}
+
+\begin{frame}
+\includegraphics[scale=0.65]{fig1 - attack.png} 
+\end{frame}
+
+\begin{frame}
+\begin{figure}[hbtp]
+\centering
+\includegraphics[scale=0.50]{fig1 - inv.png}
+
+\end{figure}
+
+\end{frame}
+
+\begin{frame}
+\begin{figure}[hbtp]
+
+\centering
+\includegraphics[scale=0.35]{table2.png}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}
+
+\textbf{Result 1:} The probability of an attack is lower when resources are distributed equally among players compared to a situation where the
+distribution of resources is unequal. 
+
+\textbf{Result 2:} The average investment in arms is lower when resources are distributed equally among players compared to a situation where the
+distribution of resources is unequal
+
+\end{frame}
+
+\begin{frame}
+\centering
+\includegraphics[scale=0.45]{fig2.png} 
+\end{frame}
+
+\begin{frame}
+\includegraphics[scale=0.33]{fig3.png} 
+\end{frame}
+
+\begin{frame}
+\includegraphics[scale=0.65]{fig 4 - attack.png} 
+\end{frame}
+
+\begin{frame}
+\includegraphics[scale=0.60]{fig 4 - inv.png} 
+\end{frame}
+
+\begin{frame}
+\includegraphics[scale=0.30]{table3.png} 
+\end{frame}
+
+
+\begin{frame}
+\centering
+\includegraphics[scale=0.5]{fig 5 - trust.png} 
+\end{frame}
+
+\begin{frame}
+\begin{figure}[hbtp]
+\centering
+\includegraphics[scale=0.5]{fig 5 - risk.png}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}
+\begin{figure}[hbtp]
+\centering
+\includegraphics[scale=0.55]{fig 5 - loss.png}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}{Conclusions}
+
+\textbf{Equal Resources:}
+\begin{itemize}
+\item Less likely to attack, reduced in arming. Theoretical predicted.
+
+\item Do not find a significant increase of unarmed peace 
+\end{itemize}
+
+\textbf{Unequal resources:}
+\begin{itemize}
+
+\item Unarmed peace comparable.
+
+\item Disadvantaged players frequently choose peace and show similar tendencies to attack, yet invest less into arming than to
+advantaged players. This unexpected finding warrants additional investigation into decisions in conflicts under inequality.
+
+\end{itemize}
+
+\end{frame}
+
+\end{document}
